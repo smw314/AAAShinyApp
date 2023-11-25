@@ -1,13 +1,9 @@
 library(baseballr)
 library(tidyverse)
-#install.packages('furrr')
 library(furrr)
 
-# figure out which level_ids we need for minor leagues
 leagues <- mlb_league(2023)
 
-# From the mlb_league function we observe the minor league season starts on April 5 and
-# ends on September 28 so we create a data.frame going through each game
 dates <- data.frame(day = rep(seq(as.Date('2023-03-30'), as.Date('2023-10-01'), by = 'days'),
                               times = 1))
 # Acquire the minor league game pks to scrape play-by-play
