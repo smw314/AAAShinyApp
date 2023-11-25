@@ -1,13 +1,9 @@
-#> add filter %in% c("Home Fields with Cameras")
-#> 
 ml_pbp <- read.csv("/Users/samwirth/Downloads/aaa_statcast/aaa_statcast/df_pbp.csv")
-
 
 fastball <- c("Four-Seam Fastball", "Sinker", "Fastball", "Two-Seam Fastball")
 breaking_ball <- c("Cutter", "Curveball", "Slider", "Sweeper", "Knuckle Curve",
                    "Eephus", "Slurve", "Slow Curve")
 offspeed <- c("Changeup", "Splitter", "Forkball", "Knuckle Ball")
-
 
 proj <- ml_pbp %>% 
   select("pitchData.coordinates.vX0", "pitchData.coordinates.vY0", 
