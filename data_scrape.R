@@ -27,11 +27,6 @@ ml_pbp <- 1:length(ml_game_pks) %>% furrr::future_map(function(x) safe_pbp(ml_ga
 #Convert to dataframe
 ml_pbp <- ml_pbp %>% as.data.frame()
 
-# Use purrr safely package to continue to run code in case of an error
-
-# SEE IF YOU CAN CLEAN THE GAME PKS HERE (EX: NO DAYTONA TORTUGAS, ETC.)
-
-
 ml_pbp <- ml_pbp %>% 
   filter(home_league_id %in% c(117, 112, 123),
          home_team != "Daytona Tortugas")
@@ -39,8 +34,3 @@ ml_pbp <- ml_pbp %>%
 write_csv(ml_pbp, 'raw_pbp.csv')
 
 ml_pbp <- read_csv('raw_pbp.csv')
-
-# write this as csv
-# then in future days just load in the most recent day and join that with
-# this csv
-
