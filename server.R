@@ -16,7 +16,6 @@ library(rsconnect)
 library(plumber)
 library(readr)
 
-# Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
   
   pitcher_data <- read_csv('pitcher_data.csv')
@@ -207,16 +206,6 @@ shinyServer(function(input, output, session) {
     scrollY = "500px",
     fixedColumns = list(leftColumns = 1)
   ) )
-  
-  # GET RID OF ML_PBP
-  #> needs
-  #> matchup.batter.fullName
-  #> hitData.coordinates.coordX
-  #> hitData.coordinates.coordY
-  #> hitData.launchSpeed
-  #> hitData.launchAngle
-
-  
   
   filtered7 <- reactive({
     batter <- bbe_data %>% 
