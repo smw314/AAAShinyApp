@@ -38,7 +38,7 @@ shinyUI(fluidPage(
                multiple = TRUE,  # Allow multiple selections
                selected = c("FSL", "PCL", "INT")  # Default selection
              ),
-             dataTableOutput("table")  # Output data table for pitcher data
+             dataTableOutput("pitcher_table")  # Updated output ID for pitcher data table
     ),
     
     # Tab for viewing data by team
@@ -52,7 +52,7 @@ shinyUI(fluidPage(
                  `live-search` = TRUE  # Enable live search for teams
                )
              ),
-             dataTableOutput("teamtable")  # Output table for team-specific data
+             dataTableOutput("pitcher_team_table")  # Updated output ID for team-specific pitcher data
     ),
     
     # Tab for viewing individual pitcher data
@@ -69,13 +69,13 @@ shinyUI(fluidPage(
              
              # Layout for displaying pitcher data table and multiple plots
              fluidRow(
-               column(12, dataTableOutput("table2")),  # Main data table for individual pitchers
-               column(4, plotOutput("plot")),  # Pitcher-related plot outputs
-               column(4, plotOutput("plot3")),
-               column(4, plotOutput("plot4")),
-               column(4, plotOutput("plot5")),
-               column(4, plotOutput("plot6")),
-               column(4, plotOutput("plot7"))
+               column(12, dataTableOutput("pitcher_individual_table")),  # Updated output ID for individual pitcher data table
+               column(4, plotOutput("pitcher_plot1")),  # Updated plot outputs
+               column(4, plotOutput("pitcher_plot2")),
+               column(4, plotOutput("pitcher_plot3")),
+               column(4, plotOutput("pitcher_plot4")),
+               column(4, plotOutput("pitcher_plot5")),
+               column(4, plotOutput("pitcher_plot6"))
              )
     ),
     
@@ -90,7 +90,7 @@ shinyUI(fluidPage(
                multiple = TRUE,  # Allow multiple selections
                selected = c("FSL", "PCL", "INT")  # Default selection
              ),
-             dataTableOutput("table3")  # Output data table for batter data
+             dataTableOutput("batter_table")  # Updated output ID for batter data table
     ),
     
     # Tab for viewing batter data by team
@@ -104,7 +104,7 @@ shinyUI(fluidPage(
                  `live-search` = TRUE  # Enable live search for batting teams
                )
              ),
-             dataTableOutput("teamtable2")  # Output table for team-specific batter data
+             dataTableOutput("batter_team_table")  # Updated output ID for team-specific batter data
     ),
     
     # Tab for viewing individual batter data
@@ -118,12 +118,12 @@ shinyUI(fluidPage(
                  `live-search` = TRUE  # Enable live search for batter names
                )
              ),
-             dataTableOutput("table4"),  # Output table for individual batter data
+             dataTableOutput("batter_specific_table"),  # Updated output ID for individual batter data
              
              # Layout for displaying batter plots
              fluidRow(
-               column(6, plotOutput("plot2")),  # Main plot for individual batters
-               column(6, plotOutput("plot99"))  # Additional plot for batter data
+               column(6, plotOutput("batter_plot1")),  # Updated plot output IDs
+               column(6, plotOutput("batter_plot2"))
              )
     ),
     
