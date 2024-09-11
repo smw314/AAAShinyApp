@@ -2,174 +2,276 @@ library(shiny)
 library(tidyverse)
 library(DT)
 library(ggplot2)
+library(rsconnect)
+library(plumber)
 library(readr)
 
+# Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
-  
-  # Load the data
+
+  # Load data files
   pitcher_data <- read_csv('pitcher_data.csv')
   batter_data <- read_csv('batter_data.csv')
-  pitcher_velocity_data <- read_csv('pitcher_data_2.csv')
+  pitcher_game_data <- read_csv('pitcher_data_2.csv')
   pitcher_usage_data <- read_csv('pitcher_data_3.csv')
-  pitch_movement_data <- read_csv('pitch_data.csv')
+  pitch_data <- read_csv('pitch_data.csv')
   batted_ball_data <- read_csv('bbe_data.csv')
-  
-  # Function to generate the spray chart layout for hit data
-  spray_chart_layout <- function(...) { 
+
+  # Function to create spray chart
+  create_spray_chart <- function(...) { 
     ggplot(...) +
       geom_curve(x = 33, xend = 223, y = -100, yend = -100, curvature = -.65, color = "black") + 
       geom_segment(x = 128, xend = 33, y = -208, yend = -100, color = "black") + 
       geom_segment(x = 128, xend = 223, y = -208, yend = -100, color = "black") +
       geom_curve(x = 83, xend = 173, y = -155, yend = -156, curvature = -.65, 
                  linetype = "dotted", color = "black") +
-      coord_fixed() + 
-      scale_x_continuous(NULL, limits = c(25, 225)) + 
+      coord_fixed() + scale_x_continuous(NULL, limits = c(25, 225)) + 
       scale_y_continuous(NULL, limits = c(-225, -25))
   }
-  
-  # Reactive filtering for pitcher data based on the selected league
+
+  # Reactive expression for filtered pitcher data
   filtered_pitcher_data <- reactive({
     pitcher_data %>% 
       filter(league %in% input$league_pitcher) %>%
       select(-filter) %>%
-      rename(
-        Name = name, Age = age, Team = team, League = league, 
-        `Pitch Type` = pitch_type, Pitches = pitches, Velocity = velocity, 
-        IVB = ivb, HB = hb, `Spin Rate` = spin_rate, `Spin Direction` = spin_direction, 
-        VAA = vaa, `Average EV` = avg_ev, `OZ%` = oz_percent, `IZ%` = iz_percent, 
-        `SwStr%` = swstr_percent, `Whiff%` = whiff_percent, `CSW%` = csw_percent, 
-        `GB%` = gb_percent
-      )
+      setNames(c("Name", "Age", "Team", "League", "Pitch Type", "Pitches", 
+                 "Velocity", "IVB", "HB", "Spin Rate", "Spin Direction", 
+                 "VAA", "Average EV", "OZ%", "IZ%", "SwStr%", "Whiff%",
+                 "CSW%", "GB%"))
   })
 
-  # Reactive filtering for specific pitcher attributes based on the selected filter
-  filtered_pitcher_by_filter <- reactive({
+  # Reactive expression for individual pitcher data
+  individual_pitcher_data <- reactive({
     pitcher_data %>% 
-      filter(filter == input$filter) %>%
+      filter(filter == input$filter) %>% 
       select(-filter, -team, -league) %>%
-      rename(
-        Name = name, Age = age, `Pitch Type` = pitch_type, Pitches = pitches, 
-        Velocity = velocity, IVB = ivb, HB = hb, `Spin Rate` = spin_rate, 
-        `Spin Direction` = spin_direction, VAA = vaa, `Average EV` = avg_ev, 
-        `OZ%` = oz_percent, `IZ%` = iz_percent, `SwStr%` = swstr_percent, 
-        `Whiff%` = whiff_percent, `CSW%` = csw_percent, `GB%` = gb_percent
-      )
+      setNames(c("Name", "Age", "Pitch Type", "Pitches", 
+                 "Velocity", "IVB", "HB", "Spin Rate", "Spin Direction", 
+                 "VAA", "Average EV", "OZ%", "IZ%", "SwStr%", "Whiff%",
+                 "CSW%", "GB%"))
   })
 
-  # Reactive filtering for pitch movement data
-  filtered_pitch_movement <- reactive({
-    pitch_movement_data %>% 
-      filter(filter == input$filter) %>%
+  # Reactive expression for pitcher pitch data
+  pitcher_pitch_data <- reactive({
+    pitch_data %>% 
+      filter(filter == input$filter) %>% 
       select(-filter)
   })
-  
-  # Reactive filtering for pitcher data by team
-  filtered_pitcher_by_team <- reactive({
+
+  # Reactive expression for team pitcher data
+  team_pitcher_data <- reactive({
     pitcher_data %>% 
-      filter(team == input$team) %>%
+      filter(team == input$team) %>% 
       select(-team, -league, -filter) %>%
-      rename(
-        Name = name, Age = age, `Pitch Type` = pitch_type, Pitches = pitches, 
-        Velocity = velocity, IVB = ivb, HB = hb, `Spin Rate` = spin_rate, 
-        `Spin Direction` = spin_direction, VAA = vaa, `Average EV` = avg_ev, 
-        `OZ%` = oz_percent, `IZ%` = iz_percent, `SwStr%` = swstr_percent, 
-        `Whiff%` = whiff_percent, `CSW%` = csw_percent, `GB%` = gb_percent
-      )
+      setNames(c("Name", "Age", "Pitch Type", "Pitches", 
+                 "Velocity", "IVB", "HB", "Spin Rate", "Spin Direction", 
+                 "VAA", "Average EV", "OZ%", "IZ%", "SwStr%", "Whiff%", 
+                 "CSW%", "GB%"))
   })
-  
-  # Reactive filtering for velocity data
-  filtered_velocity <- reactive({
-    pitcher_velocity_data %>% 
+
+  # Reactive expressions for pitcher game data and usage data
+  pitcher_game_data_filtered <- reactive({
+    pitcher_game_data %>% 
       filter(filter == input$filter)
   })
-  
-  # Reactive filtering for pitch usage data
-  filtered_usage <- reactive({
+
+  pitcher_usage_data_filtered <- reactive({
     pitcher_usage_data %>% 
       filter(filter == input$filter)
   })
-  
-  # Reactive filtering for batter data by league
+
+  # Reactive expression for filtered batter data
   filtered_batter_data <- reactive({
     batter_data %>% 
       filter(league %in% input$league_batter) %>%
-      rename(
-        Name = name, Age = age, Team = team, League = league, Pitches = pitches, 
-        BBE = bbe, `Max EV` = max_ev, `95th Pct. EV` = ev_95_pct, 
-        `Average EV` = avg_ev, `LA Sweet Spot%` = la_sweet_spot, 
-        `LA Std Dev` = la_std_dev, `OZ-Swing%` = oz_swing, `IZ-Contact%` = iz_contact, 
-        `Swing%` = swing_percent, `SwStr%` = swstr_percent, `Whiff%` = whiff_percent, 
-        `Hard Hit%` = hard_hit_percent, `Barrel%` = barrel_percent, `FB%` = fb_percent, 
-        `FB SwStr%` = fb_swstr_percent, `BB%` = bb_percent, `BB SwStr%` = bb_swstr_percent, 
-        `OFF%` = off_percent, `OFF SwStr%` = off_swstr_percent
-      )
+      setNames(c("Name", "Age", "Team", "League", "Pitches", "BBE", "Max EV",
+                 "95th Pct. EV", "Average EV", "LA Sweet Spot%",
+                 "LA Standard Deviation", "OZ-Swing%", "IZ-Contact%", "Swing%" ,
+                 "SwStr%", "Whiff%", "Hard Hit%", "Barrel%", "FB%",
+                 "FB SwStr%", "BB%", "BB SwStr%", "OFF%", "OFF SwStr%"))
   })
-  
-  # Reactive filtering for batter data by team
-  filtered_batter_by_team <- reactive({
+
+  # Reactive expression for team batter data
+  team_batter_data <- reactive({
     batter_data %>% 
-      filter(batting_team == input$team2) %>%
-      rename(
-        Name = name, Age = age, Pitches = pitches, BBE = bbe, `Max EV` = max_ev, 
-        `95th Pct. EV` = ev_95_pct, `Average EV` = avg_ev, `LA Sweet Spot%` = la_sweet_spot, 
-        `LA Std Dev` = la_std_dev, `OZ-Swing%` = oz_swing, `IZ-Contact%` = iz_contact, 
-        `Swing%` = swing_percent, `SwStr%` = swstr_percent, `Whiff%` = whiff_percent, 
-        `Hard Hit%` = hard_hit_percent, `Barrel%` = barrel_percent, `FB%` = fb_percent, 
-        `FB SwStr%` = fb_swstr_percent, `BB%` = bb_percent, `BB SwStr%` = bb_swstr_percent, 
-        `OFF%` = off_percent, `OFF SwStr%` = off_swstr_percent
-      )
+      filter(batting_team == input$team2) %>% 
+      select(-batting_team, -league) %>%
+      setNames(c("Name", "Age", "Pitches", "BBE", "Max EV",
+                 "95th Pct. EV", "Average EV", "LA Sweet Spot%",
+                 "LA Standard Deviation",
+                 "OZ-Swing%", "IZ-Contact%", "Swing%", "SwStr%", "Whiff%", "Hard Hit%", "Barrel%",
+                 "FB%", "FB SwStr%", "BB%", "BB SwStr%", "OFF%", "OFF SwStr%"))
   })
-  
-  # Reactive filtering for batter-specific data
-  filtered_batter_specific <- reactive({
+
+  # Reactive expression for individual batter data
+  individual_batter_data <- reactive({
     batter_data %>% 
       filter(matchup.batter.fullName == input$filter2) %>%
-      rename(
-        Name = name, Age = age, Team = team, League = league, Pitches = pitches, 
-        BBE = bbe, `Max EV` = max_ev, `95th Pct. EV` = ev_95_pct, `Average EV` = avg_ev, 
-        `LA Sweet Spot%` = la_sweet_spot, `LA Std Dev` = la_std_dev, `OZ-Swing%` = oz_swing, 
-        `IZ-Contact%` = iz_contact, `Swing%` = swing_percent, `SwStr%` = swstr_percent, 
-        `Whiff%` = whiff_percent, `Hard Hit%` = hard_hit_percent, `Barrel%` = barrel_percent, 
-        `FB%` = fb_percent, `FB SwStr%` = fb_swstr_percent, `BB%` = bb_percent, 
-        `BB SwStr%` = bb_swstr_percent, `OFF%` = off_percent, `OFF SwStr%` = off_swstr_percent
-      )
+      setNames(c("Name", "Age", "Team", "League", "Pitches", "BBE", "Max EV",
+                 "95th Pct. EV", "Average EV", "LA Sweet Spot%",
+                 "LA Standard Deviation",
+                 "OZ-Swing%", "IZ-Contact%", "Swing%", "SwStr%", "Whiff%", "Hard Hit%", "Barrel%",
+                 "FB%", "FB SwStr%", "BB%", "BB SwStr%", "OFF%", "OFF SwStr%"))
   })
-  
-  # Render the tables and plots in the UI
+
+  # Reactive expression for individual batter's batted ball data
+  individual_batter_bbe_data <- reactive({
+    batted_ball_data %>% 
+      filter(matchup.batter.fullName == input$filter2)
+  })
+
+  # Render data tables
   output$pitcher_table <- DT::renderDataTable({
     filtered_pitcher_data()
-  }, filter = "top", extensions = "FixedColumns", rownames = FALSE, options = list(
-    scrollX = TRUE, scrollY = "500px", fixedColumns = list(leftColumns = 1)
-  ))
-  
-  output$team_pitcher_table <- DT::renderDataTable({
-    filtered_pitcher_by_team()
-  }, filter = "top", extensions = "FixedColumns", rownames = FALSE, options = list(
-    scrollX = TRUE, scrollY = "500px", fixedColumns = list(leftColumns = 1)
-  ))
-  
-  output$filtered_pitcher_table <- DT::renderDataTable({
-    filtered_pitcher_by_filter()
-  }, filter = "top", extensions = "FixedColumns", rownames = FALSE, options = list(
-    scrollX = TRUE, scrollY = "500px", fixedColumns = list(leftColumns = 1)
+  }, filter = "top",
+  extensions = "FixedColumns", 
+  rownames = FALSE,
+  options = list(
+    scrollX = TRUE, 
+    scrollY = "500px",
+    fixedColumns = list(leftColumns = 1)
   ))
 
-  output$batter_table <- DT::renderDataTable({
+  output$team_pitcher_table <- DT::renderDataTable({
+    team_pitcher_data()
+  }, filter = "top",
+  extensions = "FixedColumns", 
+  rownames = FALSE,
+  options = list(
+    scrollX = TRUE, 
+    scrollY = "500px",
+    fixedColumns = list(leftColumns = 1)
+  ))
+
+  output$individual_pitcher_table <- renderDataTable({
+    individual_pitcher_data()
+  }, filter = "top")
+
+  output$batter_table <- renderDataTable({
     filtered_batter_data()
-  }, filter = "top", extensions = "FixedColumns", rownames = FALSE, options = list(
-    scrollX = TRUE, scrollY = "500px", fixedColumns = list(leftColumns = 1)
+  }, filter = "top",
+  extensions = "FixedColumns", 
+  rownames = FALSE,
+  options = list(
+    scrollX = TRUE, 
+    scrollY = "500px",
+    fixedColumns = list(leftColumns = 1)
   ))
-  
-  output$batter_team_table <- DT::renderDataTable({
-    filtered_batter_by_team()
-  }, filter = "top", extensions = "FixedColumns", rownames = FALSE, options = list(
-    scrollX = TRUE, scrollY = "500px", fixedColumns = list(leftColumns = 1)
+
+  output$individual_batter_table <- renderDataTable({
+    individual_batter_data()
+  })
+
+  output$team_batter_table <- DT::renderDataTable({
+    team_batter_data()
+  }, filter = "top",
+  extensions = "FixedColumns", 
+  rownames = FALSE,
+  options = list(
+    scrollX = TRUE, 
+    scrollY = "500px",
+    fixedColumns = list(leftColumns = 1)
   ))
-  
-  output$batter_specific_table <- DT::renderDataTable({
-    filtered_batter_specific()
-  }, filter = "top", extensions = "FixedColumns", rownames = FALSE, options = list(
-    scrollX = TRUE, scrollY = "500px", fixedColumns = list(leftColumns = 1)
-  ))
+
+  # Render plots
+  output$batter_spray_chart <- renderPlot({
+    create_spray_chart(individual_batter_bbe_data(), 
+                       aes(x = hitData.coordinates.coordX, 
+                           y = -hitData.coordinates.coordY, 
+                           color = hitData.launchSpeed)) + 
+      geom_point(size = 3) +
+      scale_color_gradient(low="blue", high="red") +
+      theme(panel.grid = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank(),
+            panel.background = element_blank()) +
+      labs(colour="Exit Velocity") +
+      geom_point(data = subset(individual_batter_bbe_data(), hitData.launchSpeed > 99.9), 
+                 shape=17, size=5, na.rm = TRUE)
+  })
+
+  output$batter_launch_angle_plot <- renderPlot({
+    ggplot(data = subset(individual_batter_bbe_data(), !is.na(hitData.launchAngle)), 
+           aes(x = hitData.launchAngle)) +
+      geom_density() +
+      ggtitle("Launch Angle Density Plot") +
+      xlab("Launch Angle") + ylab("Density") +
+      geom_vline(xintercept = 8, color = "red") +
+      geom_vline(xintercept = 32, color = "red")
+  })
+
+  output$pitcher_movement_plot <- renderPlot({
+    ggplot(data = subset(pitcher_pitch_data(), !is.na(details.type.description)), 
+           aes(x = hb, y = ivb, 
+               color = details.type.description)) +
+      geom_point(size = 3, alpha = .8) +
+      geom_vline(xintercept = 0) +
+      geom_hline(yintercept = 0) +
+      ggtitle("Pitch Movement Profile") +
+      xlab("HB") + ylab("IVB") +
+      guides(color = guide_legend(title = "Pitch"))
+  }, height = 350, width = 400)
+
+  output$pitcher_location_plot <- renderPlot({
+    ggplot(data = subset(pitcher_pitch_data(), !is.na(details.type.description)),
+           aes(x = pitchData.coordinates.pX, y = pitchData.coordinates.pZ, 
+               color = details.type.description)) +
+      geom_point(size = 3, alpha = .8) +
+      ggtitle("Pitch Location") +
+      xlab("Pitch Location (x)") + ylab("Pitch Location (y)") +
+      geom_rect(xmin = -(17/2)/12,
+                xmax = (17/2)/12,
+                ymin = 1.5, 
+                ymax = 3.6, 
+                alpha=0.0001,
+                color = "black") +
+      xlim(-2, 2) +
+      ylim(0, 6) +
+      guides(color = guide_legend(title = "Pitch"))
+  }, height = 350, width = 400)
+
+  output$pitcher_velocity_plot <- renderPlot({
+    ggplot(data = subset(pitcher_game_data_filtered(), !is.na(details.type.description)), 
+           aes(x = game_date, y = velo, color = details.type.description, group = details.type.description)) +
+      geom_point() +
+      geom_line() +
+      ggtitle(paste("Velocity by Appearance")) +
+      guides(color = guide_legend(title = "Pitch")) +
+      ylab('Velocity') +
+      xlab("Appearance Date")
+  }, height = 350, width = 400)
+
+  output$pitcher_usage_plot <- renderPlot({
+    ggplot(data = subset(pitcher_usage_data_filtered(), !is.na(details.type.description)), 
+           aes(x = game_date, y = pitch_percentage, color = details.type.description, group = details.type.description)) +
+      geom_point() +
+      geom_line() +
+      ggtitle(paste("Pitch Usage by Appearance")) +
+      guides(color = guide_legend(title = "Pitch")) +
+      ylab('Usage') +
+      xlab("Appearance Date")
+  }, height = 350, width = 400)
+
+  output$pitcher_ivb_plot <- renderPlot({
+    ggplot(data = subset(pitcher_game_data_filtered(), !is.na(details.type.description)), 
+           aes(x = game_date, y = pfx_z, color = details.type.description, group = details.type.description)) +
+      geom_point() +
+      geom_line() +
+      ggtitle(paste("IVB by Appearance")) +
+      guides(color = guide_legend(title = "Pitch")) +
+      ylab('IVB') +
+      xlab("Appearance Date")
+  }, height = 350, width = 400)
+
+  output$pitcher_hb_plot <- renderPlot({
+    ggplot(data = subset(pitcher_game_data_filtered(), !is.na(details.type.description)), 
+           aes(x = game_date, y = pfx_x, color = details.type.description, group = details.type.description)) +
+      geom_point() +
+      geom_line() +
+      ggtitle(paste("HB by Appearance")) +
+      guides(color = guide_legend(title = "Pitch")) +
+      ylab('HB') +
+      xlab("Appearance Date")
+  }, height = 350, width = 400)
 
 })
