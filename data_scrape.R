@@ -1,32 +1,40 @@
+# Load required libraries
 library(baseballr)
 library(tidyverse)
 library(furrr)
 
-leagues <- mlb_league(2023)
+# Get minor league information
+minor_league_info <- mlb_league(2023)
 
-dates <- data.frame(day = rep(seq(as.Date('2023-03-30'), as.Date('2023-10-01'), by = 'days'),
-                              times = 1))
-# Acquire the minor league game pks to scrape play-by-play
-minor_league_game_pk_list <- 1:nrow(dates) %>% 
-  purrr::map(function(x) mlb_game_pks(dates$day[x], level_ids = c(11, 14)))
+# Create date range for the minor league season (March 30 to October 1, 2023)
+season_dates <- data.frame(date = seq(as.Date('2023-03-30'), as.Date('2023-10-01'), by = 'days'))
 
-ml_game_pks <- minor_league_game_pk_list %>% bind_rows() %>% 
-  dplyr::filter(status.codedGameState == "F", !is.na(game_pk)) %>%
+# Function to safely get play-by-play data
+safe_get_pbp <- safely(mlb_pbp)
+
+# Get game IDs for minor league games
+minor_league_game_ids <- 1:nrow(season_dates) %>%
+  purrr::map(function(x) mlb_game_pks(season_dates$date[x], level_ids = c(11, 14))) %>%
+  bind_rows() %>%
+  filter(status.codedGameState == "F", !is.na(game_pk)) %>%
   pull(game_pk)
 
-safe_pbp <- safely(mlb_pbp)
+# Fetch play-by-play data for all minor league games
+minor_league_pbp_data <- 1:length(minor_league_game_ids) %>%
+  furrr::future_map(function(x) safe_get_pbp(minor_league_game_ids[x]), .progress = TRUE) %>%
+  map('result') %>%
+  bind_rows() %>%
+  as.data.frame()
 
-#Acquire the minor league play-by-play data
-ml_pbp <- 1:length(ml_game_pks) %>% furrr::future_map(function(x) safe_pbp(ml_game_pks[x]), .progress = T) %>%
-  map('result') %>% bind_rows()
+# Filter out unwanted teams and leagues
+filtered_minor_league_pbp <- minor_league_pbp_data %>%
+  filter(home_league_id %in% c(117, 112, 123), home_team != "Daytona Tortugas")
 
-#Convert to dataframe
-ml_pbp <- ml_pbp %>% as.data.frame()
+# Save the filtered data
+write_csv(filtered_minor_league_pbp, 'raw_pbp.csv')
 
-ml_pbp <- ml_pbp %>% 
-  filter(home_league_id %in% c(117, 112, 123),
-         home_team != "Daytona Tortugas")
-
-write_csv(ml_pbp, 'raw_pbp.csv')
-
-ml_pbp <- read_csv('raw_pbp.csv')
+# For future updates, load the existing data and append new data:
+# existing_data <- read_csv('raw_pbp.csv')
+# new_data <- get_new_pbp_data()  # Function to get only new data
+# updated_data <- bind_rows(existing_data, new_data)
+# write_csv(updated_data, 'raw_pbp.csv')
